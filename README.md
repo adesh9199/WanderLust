@@ -41,7 +41,7 @@ To get started with Wanderlust, follow these steps:
 
 1. **Clone the Repository:**
    ```sh
-   git clone https://github.com/Rpatel9675/wanderlust.git
+   git clone https://github.com/adesh9199/WanderLust.git
    cd wanderlust
    ```
 
