@@ -5,13 +5,18 @@ const Listing = require("./models/listing.js");
 const path = require("path");
 const methodOverride = require("method-override");
 const ejsMate = require("ejs-mate");
-const {listingSchema, reviewSchema}=require("./schema.js");
+const { listingSchema, reviewSchema } = require("./schema.js");
 const Review = require('./models/review'); 
-const User=require("./models/user.js");
-const passport=require("passport");
-const localStrategy=require("passport-local");
+const User = require("./models/user.js");
+const passport = require("passport");
+const localStrategy = require("passport-local");
+const session = require("express-session");
+const cookieParser = require("cookie-parser");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
+
 // Connect to MongoDB
-main()
+mongoose.connect("mongodb://localhost:27017/wanderlust")
   .then(() => {
     console.log("connected to DB");
   })
@@ -19,124 +24,111 @@ main()
     console.log(err);
   });
 
-async function main() {
-  await mongoose.connect("mongodb://localhost:27017/wanderlust");
-}
-
 // Middleware
-
-const bodyParser = require('body-parser');
 app.use(express.urlencoded({ extended: true }));
-app.use(express.json()); // Ensure this is included
+app.use(express.json());
 app.use(methodOverride("_method"));
-app.engine("ejs", ejsMate);
-app.set("view engine", "ejs");
-app.set("views", path.join(__dirname, "views"));
 app.use(express.static(path.join(__dirname, "public")));
-// app.use(session(sessionOptions));
+app.use(cookieParser());
+
+// Setup session
+app.use(session({
+  secret: "mysecretkey",
+  resave: false,
+  saveUninitialized: false,
+}));
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
+passport.use(new localStrategy(User.authenticate()));
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
 
 // Routes
 app.get("/", (req, res) => {
-  res.send("Hi, I am root");
+  res.redirect("/listings");  
 });
-//...............Home routs........................
 
-app.get("/listings", async (req, res) => {
+// Listings Routes
+app.get("/:listings", async (req, res) => {
   const allListings = await Listing.find({});
-  res.render("listings/index.ejs", { allListings });
+  res.render("listings/index.ejs", { allListings, user: req.user });
 });
-//...............New Routs........................
 
 app.get("/listings/new", (req, res) => {
   res.render("listings/new.ejs");
 });
-//...............Show listings........................
 
 app.get("/listings/:id", async (req, res) => {
   try {
     let { id } = req.params;
-    
-    // Validate ObjectId format
     if (!mongoose.isValidObjectId(id)) {
       return res.status(400).send("Invalid listing ID");
     }
-
     const listing = await Listing.findById(id).populate("reviews");
     if (!listing) {
       return res.status(404).send("Listing not found");
     }
-    
-    res.render("listings/show.ejs", { listing });
+    res.render("listings/show.ejs", { listing, user: req.user });
   } catch (err) {
     console.error("Error fetching listing:", err);
     res.status(500).send("Error fetching listing");
   }
 });
-//...............New Routs........................
 
 app.post("/listings", async (req, res) => {
   try {
     const newListing = new Listing(req.body.listing);
-    let result=listingSchema.validate(req.body);
-    if(result.error){
+    let result = listingSchema.validate(req.body);
+    if (result.error) {
       console.log("schema validation failed");
       return res.status(500).send("Wrong input");
     }
     await newListing.save();
     res.redirect("/listings");
   } catch (error) {
-    console.error(error); // Log the error
-    res.status(500).send("An error occurred while creating the listing."); // Send an error response
+    console.error(error);
+    res.status(500).send("An error occurred while creating the listing.");
   }
 });
-//...............Edit Routs........................
 
 app.get("/listings/:id/edit", async (req, res) => {
   try {
     let { id } = req.params;
-    
-    // Validate ObjectId format
     if (!mongoose.isValidObjectId(id)) {
       return res.status(400).send("Invalid listing ID");
     }
-
     const listing = await Listing.findById(id);
     if (!listing) {
       return res.status(404).send("Listing not found");
     }
-    
     res.render("listings/edit.ejs", { listing });
   } catch (err) {
     console.error("Error fetching listing for edit:", err);
     res.status(500).send("Error fetching listing for edit");
   }
 });
-//...............Update Routs........................
 
 app.put("/listings/:id", async (req, res) => {
   try {
     let { id } = req.params;
-    
-    // Validate ObjectId format
     if (!mongoose.isValidObjectId(id)) {
       return res.status(400).send("Invalid listing ID");
     }
-    let result=listingSchema.validate(req.body);
-    if(result.error){
+    let result = listingSchema.validate(req.body);
+    if (result.error) {
       console.log("schema validation failed");
       return res.status(500).send("Wrong input");
     }
-    // Update the listing
     await Listing.findByIdAndUpdate(id, { ...req.body.listing });
-
-    // Redirect to the updated listing page
     res.redirect(`/listings/${id}`);
   } catch (err) {
     console.error("Error updating listing:", err);
     res.status(500).send("Error updating listing");
   }
 });
-//...............Delete Routs........................
+
 app.delete("/listings/:id", async (req, res) => {
   try {
     let { id } = req.params;
@@ -147,12 +139,11 @@ app.delete("/listings/:id", async (req, res) => {
     res.status(500).send("Error deleting listing");
   }
 });
-//...............Add Review........................
+
 app.post("/listings/:id/reviews", async (req, res) => {
   try {
     let id = req.params.id;
-    let newReview= new Review(req.body.review);
-    console.log(req.body.review)
+    let newReview = new Review(req.body.review);
     const listing = await Listing.findById(id);
     let result = reviewSchema.validate(req.body);
     if (result.error) {
@@ -168,36 +159,56 @@ app.post("/listings/:id/reviews", async (req, res) => {
     res.status(500).send("Internal Server Error");
   }
 });
-//...............Delete Review........................
+
 app.delete("/listings/:id/reviews/:reviewId", async (req, res) => {
   try {
     let { id, reviewId } = req.params;
-
     if (!mongoose.isValidObjectId(reviewId)) {
       return res.status(400).send("Invalid review ID");
     }
-
     await Review.findByIdAndDelete(reviewId);
     await Listing.findByIdAndUpdate(id, { $pull: { reviews: reviewId } });
-
     res.redirect(`/listings/${id}`);
   } catch (err) {
     console.error("Error deleting review:", err);
     res.status(500).send("Internal Server Error");
   }
 });
-app.get("/login", (req,res)=>{
+
+app.get("/login", (req, res) => {
   res.render("users/login.ejs");
 });
-app.get("/signup", (req,res)=>{
+
+app.post("/login", passport.authenticate("local", {
+  successRedirect: "/listings",
+  failureRedirect: "/login",
+}));
+
+app.get("/signup", (req, res) => {
   res.render("users/signup.ejs");
 });
-app.post("/signup", async(req,res)=>{
-  console.log(req.body);
-  let newUser= new User(req.body);
-  await newUser.save();
+
+app.post("/signup", async (req, res) => {
+  try {
+    const hashedPassword = await bcrypt.hash(req.body.password, 10);
+    const newUser = new User({ 
+      username: req.body.username, 
+      email: req.body.email,
+      password: hashedPassword 
+    });
+    await newUser.save();
+    res.redirect("/listings");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("An error occurred while signing up.");
+  }
+});
+
+app.get("/logout", (req, res) => {
+  req.logout();
   res.redirect("/listings");
 });
+
 app.get("/*", (req, res) => {
   res.send("Wrong url");
 });

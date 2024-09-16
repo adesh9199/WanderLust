@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HomeHevan</title>
+    <title>WanderLust</title>
     <link rel="stylesheet" href="/css/style.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"
         integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
@@ -17,6 +17,10 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;1,300&display=swap"
         rel="stylesheet">
+    <link rel="apple-touch-icon" sizes="180x180" href="../icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="../icons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../icons/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
     <link rel="stylesheet" href="/css/rating.css">
     <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.45.0/mapbox-gl.css' rel='stylesheet' />
     <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.45.0/mapbox-gl.js'></script>
@@ -44,7 +48,7 @@
         }
 
         .tax-info {
-            display: none;
+            display: inline;
         }
 
         .tax-toggle {
@@ -94,12 +98,11 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
                 <div class="navbar-nav">
-                    <a class="nav-link logo" href="/listings">HomeHevan</a>
+                    <a class="nav-link logo" href="/listings">WanderLust</a>
                 </div>
                 <div class="navbar-nav ms-auto">
                     <a href="/signup"> <button class="btn btn-search" type="submit">
                         <i class="fa-solid fa-user"></i>Signup</button></a>
-                       
                 </div>
             </div>
         </div>
@@ -166,16 +169,16 @@
         </div>
     </div>
 
-    <div class="row row-cols-lg-3 row-cols-md-2 row-cols-sm-1 mt-3">
+    <div class="row row-cols-lg-3 row-cols-md-2 row-cols-sm-1 mt-3 ">
         <% for(let listing of allListings) { %>
         <a href="/listings/<%= listing._id %>" class="listing-link">
             <div class="card col listing-card">
                 <img src="<%= listing.image %>" class="card-img-top" alt="listing_image" style="height: 20rem;">
                 <div class="card-img-overlay"></div>
                 <div class="card-body">
-                    <p class="card-text">
+                    <p class="card-text" data-price="<%= listing.price %>">
                         <b><%= listing.title %> </b><br>
-                        &#8377; <%= listing.price.toLocaleString("en-IN") %> / night
+                        &#8377; <span class="listing-price"><%= listing.price.toLocaleString("en-IN") %></span> / night
                         <i class="tax-info">&nbsp; &nbsp; +18% GST</i>
                     </p>
                 </div>
@@ -187,33 +190,43 @@
     <footer>
         <div class="f-info">
             <div class="f-info-socials">
-                <a href="https://www.instagram.com/itz___harshrajput/" style="color: inherit;"><i
+                <a href="https://www.instagram.com/adesh_bhardwaj1/" style="color: inherit;"><i
                         class="fa-brands fa-square-instagram"></i></a>
-                <a href="https://www.linkedin.com/in/harsh-singh-5b5a0b256/" style="color: inherit;"><i
+                <a href="https://www.linkedin.com/in/adesh-kumar-dubey-427073227/" style="color: inherit;"><i
                         class="fa-brands fa-linkedin"></i></a>
-                <a href="https://github.com/h4rshgithub" style="color: inherit;"><i
-                        class="fa-brands fa-square-github"></i></a>
+                <a href="https://github.com/adesh9199/adesh9199" style="color: inherit;"><i
+                        class="fa-brands fa-github"></i></a>
             </div>
-            <div class="f-info-brand">&copy; HomeHevan Private Limited</div>
-            <div class="f-info-links">
-                <a href="/privacy">Privacy</a>
-                <a href="/terms">Terms</a>
-            </div>
+            <p>&copy; 2024 WanderLust. All Rights Reserved.</p>
         </div>
     </footer>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-euROytX1uSoCR2lLn2kGHd4e/4JXyYhwTcwh2Zr5Xx5SBGg9J1R3vjAfTeUpP"
+        crossorigin="anonymous"></script>
     <script>
         let taxSwitch = document.getElementById("flexSwitchCheckDefault");
-        taxSwitch.addEventListener("click", () => {
+
+        function updatePrices() {
             let taxInfo = document.getElementsByClassName("tax-info");
+            let displayTax = taxSwitch.checked;
+
             for (let info of taxInfo) {
-                if (info.style.display != "inline") {
-                    info.style.display = "inline";
-                } else {
-                    info.style.display = "none";
-                }
+                info.style.display = displayTax ? "none" : "inline";
             }
-        })
+
+            let prices = document.getElementsByClassName("listing-price");
+            for (let priceElement of prices) {
+                let originalPrice = parseFloat(priceElement.parentElement.getAttribute("data-price"));
+                let displayedPrice = displayTax ? (originalPrice * 1.18).toLocaleString("en-IN") : originalPrice.toLocaleString("en-IN");
+                priceElement.textContent = displayedPrice;
+            }
+        }
+
+        // Initial update
+        updatePrices();
+
+        taxSwitch.addEventListener("change", updatePrices);
     </script>
 </body>
 
